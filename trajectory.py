@@ -67,13 +67,30 @@ if submitted:
         del remaining[idx]
     
     st.subheader("Optimal Trajectory (Order of Visit)")
+    # Calculate estimated time between stops (assuming average speed, e.g., 50 km/h)
+    avg_speed_kmh = 50  # You can adjust this value
+    times = [0.0]  # First stop is the start
+    dists = [0.0]
+    total_time = 0.0
+    total_dist = 0.0
+    for i in range(1, len(route)):
+        dist = geodesic(route[i-1][1], route[i][1]).km
+        dists.append(dist)
+        time = dist / avg_speed_kmh  # in hours
+        times.append(time)
+        total_time += time
+        total_dist += dist
+    
     df = pd.DataFrame({
         "Order": list(range(1, len(route)+1)),
         "Location": [x[0] for x in route],
         "Latitude": [x[1][0] for x in route],
-        "Longitude": [x[1][1] for x in route]
+        "Longitude": [x[1][1] for x in route],
+        "Distance from Prev (km)": [round(d, 2) for d in dists],
+        "Est. Time from Prev (min)": [round(t*60, 1) for t in times],
     })
     st.dataframe(df)
+    st.info(f"Total estimated distance: {round(total_dist, 2)} km. Total estimated time: {round(total_time*60, 1)} minutes (at {avg_speed_kmh} km/h average speed).")
     
     # Map Plot with pydeck: show markers and the trajectory path
     import pydeck as pdk
