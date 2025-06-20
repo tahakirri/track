@@ -145,6 +145,16 @@ if not locations:
     })
     st.dataframe(df)
     st.info(f"Total estimated distance: {round(total_dist, 2)} km. Total estimated time: {round(total_time*60, 1)} minutes (at {avg_speed_kmh} km/h average speed).")
+
+    # Generate Google Maps directions link
+    base_url = "https://www.google.com/maps/dir/?api=1"
+    start_str = f"{route[0][1][0]},{route[0][1][1]}"
+    waypoints = [f"{x[1][0]},{x[1][1]}" for x in route[1:-1]] if len(route) > 2 else []
+    dest_str = f"{route[-1][1][0]},{route[-1][1][1]}"
+    gmaps_url = f"{base_url}&origin={start_str}&destination={dest_str}"
+    if waypoints:
+        gmaps_url += "&waypoints=" + "|".join(waypoints)
+    st.markdown(f"[Open route in Google Maps]({gmaps_url})", unsafe_allow_html=True)
     
     # Map Plot with pydeck: show markers and the trajectory path
     import pydeck as pdk
