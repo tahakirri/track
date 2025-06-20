@@ -2,3 +2,4 @@ streamlit
 geopy
 pandas
 numpy
+streamlit-folium
