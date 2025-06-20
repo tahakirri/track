@@ -154,7 +154,8 @@ if not locations:
     gmaps_url = f"{base_url}&origin={start_str}&destination={dest_str}"
     if waypoints:
         gmaps_url += "&waypoints=" + "|".join(waypoints)
-    st.markdown(f"[Open route in Google Maps]({gmaps_url})", unsafe_allow_html=True)
+    if st.button("Open route in Google Maps"):
+        st.experimental_open_url(gmaps_url)
     
     # Map Plot with pydeck: show markers and the trajectory path
     import pydeck as pdk
