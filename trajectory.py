@@ -11,49 +11,103 @@ st.markdown("""
 Enter your starting location and a list of locations (addresses or coordinates). The app will compute the most optimal trajectory to visit all locations starting from the start location.
 """)
 
-with st.form("location_form"):
+from streamlit_folium import st_folium
+import folium
+
+st.markdown("---")
+st.subheader("Pick Start and Other Locations on the Map")
+
+# Initialize session state for locations
+if 'picked_points' not in st.session_state:
+    st.session_state['picked_points'] = []
+if 'start_point' not in st.session_state:
+    st.session_state['start_point'] = None
+
+def reset_points():
+    st.session_state['picked_points'] = []
+    st.session_state['start_point'] = None
+
+st.button("Reset Map Selections", on_click=reset_points)
+
+# Create a Folium map
+m = folium.Map(location=[30, 0], zoom_start=2)
+
+# Add markers for already picked points
+for i, pt in enumerate(st.session_state['picked_points']):
+    folium.Marker(pt, icon=folium.Icon(color='blue', icon='info-sign'), tooltip=f"Stop {i+1}").add_to(m)
+if st.session_state['start_point']:
+    folium.Marker(st.session_state['start_point'], icon=folium.Icon(color='red', icon='star'), tooltip="Start").add_to(m)
+
+# Show map and handle clicks
+map_data = st_folium(m, width=700, height=500)
+
+if map_data and map_data['last_clicked']:
+    lat = map_data['last_clicked']['lat']
+    lon = map_data['last_clicked']['lng']
+    if st.button("Set as Start Location", key=f"set_start_{lat}_{lon}"):
+        st.session_state['start_point'] = (lat, lon)
+    if st.button("Add as Stop Location", key=f"add_stop_{lat}_{lon}"):
+        if (lat, lon) not in st.session_state['picked_points']:
+            st.session_state['picked_points'].append((lat, lon))
+
+# Optionally, allow manual entry as fallback
+with st.expander("Or enter locations manually"):
     start_location = st.text_input("Start Location (address or lat,lon)")
     locations_text = st.text_area("Other Locations (one per line, address or lat,lon)")
-    submitted = st.form_submit_button("Find Optimal Trajectory")
-
-if submitted:
-    geolocator = Nominatim(user_agent="streamlit-optimal-trajectory")
-    
-    def parse_location(loc):
-        loc = loc.strip()
-        if "," in loc:
+    manual_submit = st.button("Add Manual Locations")
+    if manual_submit:
+        geolocator = Nominatim(user_agent="streamlit-optimal-trajectory")
+        def parse_location(loc):
+            loc = loc.strip()
+            if "," in loc:
+                try:
+                    lat, lon = map(float, loc.split(","))
+                    return (lat, lon)
+                except:
+                    pass
             try:
-                lat, lon = map(float, loc.split(","))
-                return (lat, lon)
+                location = geolocator.geocode(loc)
+                if location:
+                    return (location.latitude, location.longitude)
             except:
                 pass
-        # Try to geocode address
-        try:
-            location = geolocator.geocode(loc)
-            if location:
-                return (location.latitude, location.longitude)
-        except:
-            pass
-        return None
-    
-    # Parse start location
-    start_coords = parse_location(start_location)
-    if not start_coords:
-        st.error("Could not parse start location.")
-        st.stop()
-    
-    # Parse other locations
-    locations = []
-    for line in locations_text.strip().split("\n"):
-        if line.strip():
-            coords = parse_location(line)
-            if coords:
-                locations.append((line.strip(), coords))
-            else:
-                st.warning(f"Could not parse location: {line}")
-    if not locations:
-        st.error("No valid locations provided.")
-        st.stop()
+            return None
+        # Add start
+        coords = parse_location(start_location)
+        if coords:
+            st.session_state['start_point'] = coords
+        # Add stops
+        for line in locations_text.strip().split("\n"):
+            if line.strip():
+                coords = parse_location(line)
+                if coords and coords not in st.session_state['picked_points']:
+                    st.session_state['picked_points'].append(coords)
+
+# Use picked points for calculation
+geolocator = Nominatim(user_agent="streamlit-optimal-trajectory")
+
+# Reverse geocode start and stops
+start_coords = st.session_state['start_point']
+if start_coords:
+    try:
+        start_address = geolocator.reverse(start_coords, language='en').address
+    except:
+        start_address = f"{start_coords[0]}, {start_coords[1]}"
+else:
+    st.warning("Please select a start location on the map or enter it manually.")
+    st.stop()
+
+locations = []
+for pt in st.session_state['picked_points']:
+    try:
+        address = geolocator.reverse(pt, language='en').address
+    except:
+        address = f"{pt[0]}, {pt[1]}"
+    locations.append((address, pt))
+
+if not locations:
+    st.warning("Please add at least one stop location on the map or enter it manually.")
+    st.stop()
     
     # Nearest Neighbor TSP
     remaining = locations.copy()
